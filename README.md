@@ -72,3 +72,33 @@ SQL_PASS='<пароль sa>' ./deploy.sh          # Linux/macOS/WSL
 ![Orders](docs/erd-orders.png)
 ![Catalog](docs/erd-catalog.png)
 ![Reviews](docs/erd-reviews.png)
+
+
+# TechStore Platform — Orders service
+
+## Вимоги
+.NET SDK 9+, SQL Server (локальний), скрипти БД виконані в порядку:
+schema.sql → procedures.sql → seed.sql → (security.sql)
+
+## Запуск
+dotnet dev-certs https --trust
+dotnet run --project Platform.AppHost
+Aspire Dashboard: адреса в консолі. Swagger: <URL orders-api>/swagger
+
+## Схема рішення
+Orders.Api → Orders.Bll → Orders.Dal; Orders.Domain спільний.
+Транзакційна операція: POST /api/orders/{id}/payments
+(PaymentRecords + Orders + OrderStatusHistory в одній транзакції).
+Ізоляція: ReadCommitted; процедури додатково беруть UPDLOCK/HOLDLOCK.
+
+## Приклади запитів
+curl -X POST http://localhost:PORT/api/customers -H "Content-Type: application/json" \
+  -d '{"fullName":"Тест","email":"t@example.com","phone":"+380931234567"}'
+
+curl -X POST http://localhost:PORT/api/orders -H "Content-Type: application/json" \
+  -d '{"customerId":1,"city":"Чернівці","address":"вул. Головна, 1","deliveryMethod":"Courier","items":[{"productId":1,"quantity":1}]}'
+
+curl -X POST http://localhost:PORT/api/orders/2/confirm
+curl -X POST http://localhost:PORT/api/orders/2/payments -H "Content-Type: application/json" \
+  -d '{"amount":27999,"method":"Card","externalTxnId":"TXN-0002"}'
+curl http://localhost:PORT/api/orders/9999     # 404 ProblemDetails
