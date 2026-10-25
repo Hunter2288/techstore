@@ -21,8 +21,7 @@ namespace Catalog.Dal.Repositories
         public void Update(T entity) => Set.Update(entity);
         public void Delete(T entity) => Set.Remove(entity);
 
-        public Task<int> SaveChangesAsync(CancellationToken ct = default)
-            => Context.SaveChangesAsync(ct);
+
     }
 
 }
