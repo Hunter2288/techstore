@@ -1,0 +1,11 @@
+@Catalog.Api_HostAddress = http://localhost:5178
+
+GET {{Catalog.Api_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
+
+GET {{Catalog.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

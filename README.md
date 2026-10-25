@@ -74,31 +74,106 @@ SQL_PASS='<пароль sa>' ./deploy.sh          # Linux/macOS/WSL
 ![Reviews](docs/erd-reviews.png)
 
 
-# TechStore Platform — Orders service
+## Лаб. 02–03: мікросервіси Orders та Catalog
 
-## Вимоги
-.NET SDK 9+, SQL Server (локальний), скрипти БД виконані в порядку:
-schema.sql → procedures.sql → seed.sql → (security.sql)
+Рішення `Platform.slnx` містить два сервіси та Aspire AppHost:
 
-## Запуск
+| Сервіс | Проєкт №  | Доступ до даних | База |
+|---|---|---|---|
+| `Services/Orders` | 1 | ADO.NET + Dapper, Unit of Work | `TechStore_Orders` (SQL-скрипти з `db/p1`) |
+| `Services/Catalog` | 2 | EF Core (Code-First), Unit of Work | `TechStore_CatalogEf` (створюється міграціями) |
+
+Шари кожного сервісу: `*.Api` → `*.Bll` → `*.Dal`, спільні моделі та винятки в `*.Domain`.
+
+### Вимоги
+- .NET 10 SDK, SQL Server (у прикладах інстанс `localhost\SQLEXPRESS`, автентифікація Windows)
+- інструмент `dotnet-ef`: `dotnet tool install --global dotnet-ef`
+
+### Розгортання баз даних
+**Orders** (скрипти Лаб. 01), у такому порядку: `db/p1/schema.sql` → `db/p1/procedures.sql` → `db/p1/seed.sql`
+(опційно `db/p1/security.sql`). Скрипти ідемпотентні.
+
+**Catalog** створюється з моделей міграціями. Окремо нічого виконувати не треба: застосунок
+сам викликає `MigrateAsync()` та ідемпотентний сідінг при старті (у `Production` сідінг вимкнено).
+Вручну:
+```powershell
+dotnet ef database update --project Services/Catalog/Catalog.Dal --startup-project Services/Catalog/Catalog.Api
+```
+Нова міграція після зміни моделей:
+```powershell
+dotnet ef migrations add <Назва> --project Services/Catalog/Catalog.Dal --startup-project Services/Catalog/Catalog.Api
+```
+SQL-скрипт усіх міграцій: `Services/Catalog/Catalog.Dal/Migrations/catalog-migrations.sql`
+(генерується командою `dotnet ef migrations script --idempotent ... -o ...`).
+
+Сідінг: довідники (`Brands`, `Categories`) задані статично через `HasData`, товари, зображення,
+деталі та зв'язки з категоріями додає `DbInitializer` лише якщо таблиця `Products` порожня,
+тож повторний запуск не створює дублів.
+
+### Запуск через Aspire
+Рядки підключення задано в `Platform.AppHost/appsettings.json` (`OrdersDb`, `CatalogDb`);
+Aspire передає їх сервісам як `ConnectionStrings__OrdersDb` / `ConnectionStrings__CatalogDb`.
+```powershell
 dotnet dev-certs https --trust
 dotnet run --project Platform.AppHost
-Aspire Dashboard: адреса в консолі. Swagger: <URL orders-api>/swagger
+```
+У консолі буде посилання на Aspire Dashboard: ресурси `orders-api` і `catalog-api` мають статус Running.
+Swagger кожного сервісу: `<URL з Dashboard>/swagger`.
 
-## Схема рішення
-Orders.Api → Orders.Bll → Orders.Dal; Orders.Domain спільний.
-Транзакційна операція: POST /api/orders/{id}/payments
-(PaymentRecords + Orders + OrderStatusHistory в одній транзакції).
-Ізоляція: ReadCommitted; процедури додатково беруть UPDLOCK/HOLDLOCK.
+Один сервіс без Aspire:
+```powershell
+dotnet run --project Services/Orders/Orders.Api
+dotnet run --project Services/Catalog/Catalog.Api
+```
 
-## Приклади запитів
-curl -X POST http://localhost:PORT/api/customers -H "Content-Type: application/json" \
-  -d '{"fullName":"Тест","email":"t@example.com","phone":"+380931234567"}'
+### Приклади запитів
+Замініть `PORT` на порт сервісу з Dashboard. У PowerShell використовуйте `curl.exe`.
 
-curl -X POST http://localhost:PORT/api/orders -H "Content-Type: application/json" \
-  -d '{"customerId":1,"city":"Чернівці","address":"вул. Головна, 1","deliveryMethod":"Courier","items":[{"productId":1,"quantity":1}]}'
+**Catalog**
+```bash
+# пагінація, фільтрація, сортування (виконуються в SQL)
+curl "https://localhost:PORT/api/products?page=2&pageSize=5&search=Sony&minPrice=5000&sortBy=price&sortDir=desc"
+# картка товару (Eager Loading)
+curl https://localhost:PORT/api/products/1
+# товари категорії (Explicit Loading)
+curl https://localhost:PORT/api/categories/2/products
+# нові товари в категорії за поле AddedAt (M:N)
+curl "https://localhost:PORT/api/products/recent?category=Смартфони&days=30"
+# створення (201 + Location); повтор з тим самим SKU дає 409, порожнє name дає 400
+curl -X POST https://localhost:PORT/api/products -H "Content-Type: application/json" \
+  -d '{"name":"Test phone","sku":"TST-1","price":999,"brandId":1,"initialStock":5}'
+# нестача залишку дає 409
+curl -X POST https://localhost:PORT/api/products/1/stock/remove -H "Content-Type: application/json" -d '{"quantity":999}'
+```
+Відповідь списку: `items`, `totalCount`, `page`, `pageSize`, `totalPages`, `hasNext`, `hasPrevious`
+у тілі, а `totalCount` і `totalPages` ще й у заголовках `X-Total-Count`, `X-Total-Pages`.
+`pageSize` обмежено 1–100, `sortBy`: `name` | `price` | `stock`.
 
-curl -X POST http://localhost:PORT/api/orders/2/confirm
-curl -X POST http://localhost:PORT/api/orders/2/payments -H "Content-Type: application/json" \
+**Orders**
+```bash
+curl https://localhost:PORT/api/customers
+curl https://localhost:PORT/api/orders/9999                 # 404, ProblemDetails
+curl -X POST https://localhost:PORT/api/orders/2/confirm    # 204, повтор дає 409
+curl -X POST https://localhost:PORT/api/orders/2/payments -H "Content-Type: application/json" \
   -d '{"amount":27999,"method":"Card","externalTxnId":"TXN-0002"}'
-curl http://localhost:PORT/api/orders/9999     # 404 ProblemDetails
+```
+
+### Помилки та логування
+Усі помилки повертаються у форматі `ProblemDetails` (400 валідація, 404 не знайдено, 409 конфлікт).
+Логи структуровані (Serilog, консоль + `logs/catalog-*.log`), у кожному записі є `CorrelationId`,
+`RequestPath`, `UserId`. SQL-команди EF Core логуються на рівні Information
+(видно, що Eager Loading виконує один запит, а Explicit Loading два).
+
+### Політика дублювання даних між контекстами
+| Дані | Власник | Копія | Де | Призначення |
+|---|---|---|---|---|
+| `Name`, `Price`, `IsActive` товару | Catalog (`Products`) | `ProductRefs` | Orders | довідкова копія, щоб створити замовлення без запиту до Catalog |
+| `ProductName`, `UnitPrice` | Orders (`OrderItems`) | знімок із `ProductRefs` на момент замовлення | Orders | історія замовлення не змінюється при зміні ціни чи назви |
+| `productName` | Catalog (`Products`) | поле в `reviews`, `discussions` | Reviews (MongoDB) | показ відгуку без JOIN; оновлюється `updateMany` |
+| ім'я клієнта (`displayName`) | Orders (`Customers`) | `author`, `createdBy` у `reviews`, `discussions`, `comments` | Reviews (MongoDB) | відображення автора |
+| `orderId` | Orders (`Orders`) | `reviews.orderId` + `isVerifiedPurchase` | Reviews (MongoDB) | посилання на покупку, зв'язок без FK |
+| оцінки (`count`, `sum`, `avg`, `distribution`) | Reviews (`reviews`) | `ratings` | Reviews (MongoDB) | швидке читання рейтингу |
+| `commentCount`, `lastComments` | Reviews (`comments`) | вбудовано в `discussions` | Reviews (MongoDB) | швидка картка дискусії |
+
+Залишок товару (`StockQuantity`) зберігається лише в Catalog і ніде не дублюється.
+
