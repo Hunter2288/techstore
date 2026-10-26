@@ -18,7 +18,20 @@ public sealed class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Виконання MediatR-запиту {RequestName}", typeof(TRequest).Name);
-        return await next(cancellationToken);
+        var name = typeof(TRequest).Name;
+        _logger.LogInformation("Початок обробки {RequestName} {@Request}", name, request);
+
+        try
+        {
+            var response = await next(cancellationToken);
+            _logger.LogInformation("Запит {RequestName} успішно оброблено", name);
+            return response;
+        }
+        catch (Exception ex)
+        {
+          
+            _logger.LogWarning("Запит {RequestName} завершився помилкою {ErrorType}", name, ex.GetType().Name);
+            throw;
+        }
     }
 }

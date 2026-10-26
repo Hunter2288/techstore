@@ -29,43 +29,57 @@ public sealed class ExceptionHandlingMiddleware
         {
             var errors = exception.Errors
                 .GroupBy(x => x.PropertyName)
-                .ToDictionary(group => group.Key, group => group.Select(x => x.ErrorMessage).Distinct().ToArray());
-            await WriteProblemAsync(context, StatusCodes.Status400BadRequest, "Помилка валідації", "Перевірте передані дані.", errors);
+                .ToDictionary(g => g.Key, g => g.Select(x => x.ErrorMessage).Distinct().ToArray());
+            _logger.LogWarning("Валідація не пройшла для {Path}: {@Errors}", context.Request.Path, errors);
+            await WriteProblemAsync(context, StatusCodes.Status400BadRequest,
+                "Помилка валідації", "Перевірте передані дані.", errors);
         }
         catch (ReviewNotFoundException exception)
         {
-            await WriteProblemAsync(context, StatusCodes.Status404NotFound, "Відгук не знайдено", exception.Message);
+            _logger.LogWarning("Не знайдено на {Path}: {Message}", context.Request.Path, exception.Message);
+            await WriteProblemAsync(context, StatusCodes.Status404NotFound,
+                "Відгук не знайдено", exception.Message);
         }
         catch (ConcurrencyConflictException exception)
         {
-            await WriteProblemAsync(context, StatusCodes.Status409Conflict, "Конфлікт версій", exception.Message);
+            _logger.LogWarning("Конфлікт версій на {Path}: {Message}", context.Request.Path, exception.Message);
+            await WriteProblemAsync(context, StatusCodes.Status409Conflict,
+                "Конфлікт версій", exception.Message);
         }
-        catch (MongoWriteException exception) when (exception.WriteError?.Code == 11000)
+        catch (MongoWriteException exception) when (exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
-            await WriteProblemAsync(context, StatusCodes.Status409Conflict, "Дублікат", "Автор уже залишив відгук на цей товар.");
+            _logger.LogWarning("Дублікат ключа на {Path}", context.Request.Path);
+            await WriteProblemAsync(context, StatusCodes.Status409Conflict,
+                "Дублікат", "Автор уже залишив відгук на цей товар.");
+        }
+        catch (MongoWriteException exception)
+        {
+            _logger.LogWarning(exception, "Помилка запису в MongoDB на {Path}", context.Request.Path);
+            await WriteProblemAsync(context, StatusCodes.Status400BadRequest,
+                "Помилка запису", "Документ не пройшов перевірку бази даних.");
         }
         catch (DomainException exception)
         {
-            await WriteProblemAsync(context, StatusCodes.Status400BadRequest, "Помилка предметної області", exception.Message);
+            _logger.LogWarning("Порушено правило домену на {Path}: {Message}", context.Request.Path, exception.Message);
+            await WriteProblemAsync(context, StatusCodes.Status400BadRequest,
+                "Помилка предметної області", exception.Message);
         }
-        catch (MongoException exception)
+        catch (Exception exception) when (exception is MongoException or TimeoutException)
         {
-            _logger.LogError(exception, "Помилка MongoDB під час обробки {Path}", context.Request.Path);
-            await WriteProblemAsync(context, StatusCodes.Status503ServiceUnavailable, "MongoDB недоступна", "Не вдалося виконати операцію з базою даних.");
+            _logger.LogError(exception, "MongoDB недоступна під час обробки {Path}", context.Request.Path);
+            await WriteProblemAsync(context, StatusCodes.Status503ServiceUnavailable,
+                "MongoDB недоступна", "Не вдалося виконати операцію з базою даних.");
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Необроблена помилка під час обробки {Path}", context.Request.Path);
-            await WriteProblemAsync(context, StatusCodes.Status500InternalServerError, "Внутрішня помилка", "Сталася неочікувана помилка.");
+            await WriteProblemAsync(context, StatusCodes.Status500InternalServerError,
+                "Внутрішня помилка", "Сталася неочікувана помилка.");
         }
     }
 
     private static async Task WriteProblemAsync(
-        HttpContext context,
-        int status,
-        string title,
-        string detail,
-        object? errors = null)
+        HttpContext context, int status, string title, string detail, object? errors = null)
     {
         if (context.Response.HasStarted)
             return;
@@ -81,6 +95,7 @@ public sealed class ExceptionHandlingMiddleware
             Detail = detail,
             Instance = context.Request.Path
         };
+        problem.Extensions["traceId"] = context.TraceIdentifier;
         if (errors is not null)
             problem.Extensions["errors"] = errors;
 

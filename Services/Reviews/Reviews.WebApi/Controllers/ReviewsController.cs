@@ -33,11 +33,16 @@ public sealed class ReviewsController : ControllerBase
 
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ReviewDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ReviewDto>> GetById(string id, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new GetReviewByIdQuery(id), cancellationToken);
-        return result is null ? NotFound() : Ok(result);
+        if (result is null)
+            return NotFound();
+
+        Response.Headers.ETag = $"\"{result.Version}\"";
+        return Ok(result);
     }
 
     [HttpPost]

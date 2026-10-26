@@ -8,27 +8,22 @@ namespace Reviews.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplication(this IServiceCollection services)
+    public static IServiceCollection AddApplication(
+        this IServiceCollection services, string? licenseKey = null)
     {
         var assembly = Assembly.GetExecutingAssembly();
 
-        services.AddMediatR(configuration =>
-            configuration.RegisterServicesFromAssembly(assembly));
+        services.AddMediatR(cfg =>
+        {
+            cfg.LicenseKey = licenseKey;
+            cfg.RegisterServicesFromAssembly(assembly);
+            cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));      
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));   
+            cfg.AddOpenBehavior(typeof(PerformanceBehavior<,>));  
+        });
 
-        services.AddAutoMapper(configuration => { }, assembly);
+        services.AddAutoMapper(cfg => cfg.LicenseKey = licenseKey, assembly);
         services.AddValidatorsFromAssembly(assembly);
-
-        services.AddTransient(
-            typeof(IPipelineBehavior<,>),
-            typeof(ValidationBehavior<,>));
-
-        services.AddTransient(
-            typeof(IPipelineBehavior<,>),
-            typeof(LoggingBehavior<,>));
-
-        services.AddTransient(
-            typeof(IPipelineBehavior<,>),
-            typeof(PerformanceBehavior<,>));
         return services;
     }
 }
