@@ -2,30 +2,27 @@ using Reviews.Application;
 using Reviews.Infrastructure;
 using Reviews.WebApi;
 using Reviews.WebApi.Middleware;
-using Serilog;
+using Reviews.WebApi.Health;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Host.UseSerilog((ctx, cfg) => cfg
-    .ReadFrom.Configuration(ctx.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console());
+builder.AddServiceDefaults();
 
 builder.Services.AddApplication(builder.Configuration["LuckyPenny:LicenseKey"]);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddWebApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddHealthChecks().AddCheck<MongoDbHealthCheck>("mongodb");
 
 var app = builder.Build();
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
-
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapDefaultEndpoints();
 
 app.Run();

@@ -8,12 +8,20 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\..\..\db\p1\schema.sql" Link="db\p1\schema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\db\p1\procedures.sql" Link="db\p1\procedures.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\db\p1\seed.sql" Link="db\p1\seed.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Orders.Bll\Orders.Bll.csproj" />
+    <ProjectReference Include="..\..\..\Platform.ServiceDefaults\Platform.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

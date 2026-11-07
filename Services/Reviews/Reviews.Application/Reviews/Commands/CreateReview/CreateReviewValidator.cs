@@ -1,10 +1,11 @@
 using FluentValidation;
+using Reviews.Domain.Interfaces;
 
 namespace Reviews.Application.Reviews.Commands.CreateReview;
 
 public sealed class CreateReviewValidator : AbstractValidator<CreateReviewCommand>
 {
-    public CreateReviewValidator()
+    public CreateReviewValidator(IReviewRepository reviews)
     {
         RuleFor(x => x.ProductId).GreaterThan(0);
         RuleFor(x => x.ProductName).NotEmpty().MaximumLength(200);
@@ -25,6 +26,9 @@ public sealed class CreateReviewValidator : AbstractValidator<CreateReviewComman
         RuleFor(x => x.Rating).InclusiveBetween(1, 5)
             .WithMessage("Оцінка має бути від 1 до 5.");
 
+        RuleFor(x => x).MustAsync(async (command, cancellationToken) =>
+                command.Author is null || !await reviews.ExistsAsync(command.ProductId, command.Author.UserId, cancellationToken))
+            .WithMessage("Цей користувач уже залишив відгук на цей товар.");
         RuleForEach(x => x.Pros).NotEmpty().MaximumLength(200);
         RuleForEach(x => x.Cons).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Pros).Must(x => x is null || x.Count <= 20)

@@ -2,17 +2,23 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace Catalog.Bll.Services
 {
-    public class ProductService(IUnitOfWork uow, IMapper mapper) : IProductService
+    public class ProductService(IUnitOfWork uow, IMapper mapper, ILogger<ProductService>? logger = null) : IProductService
     {
+        private static readonly ActivitySource ActivitySource = new("Catalog.Api");
         public async Task<ProductCardDto> GetByIdAsync(long id, CancellationToken ct)
             => mapper.Map<ProductCardDto>(await uow.Products.GetWithDetailsAsync(id, ct)
                 ?? throw new EntityNotFoundException($"Product {id} not found"));
 
         public async Task<ProductDto> CreateAsync(CreateProductDto input, CancellationToken ct)
         {
+            using var activity = ActivitySource.StartActivity("catalog.product.create");
+            activity?.SetTag("product.sku", input.Sku);
+            activity?.SetTag("product.brand_id", input.BrandId);
             if (await uow.Products.ExistsBySkuAsync(input.Sku, ct))
                 throw new ConflictException($"Product with SKU '{input.Sku}' already exists");
             _ = await uow.Brands.GetByIdAsync(input.BrandId, ct)
@@ -23,21 +29,33 @@ namespace Catalog.Bll.Services
 
             await uow.Products.AddAsync(product, ct);
             await uow.SaveChangesAsync(ct);
-            return mapper.Map<ProductDto>(product);
+            var result = mapper.Map<ProductDto>(product);
+            activity?.SetTag("product.id", result.ProductId);
+            activity?.SetTag("product.price", result.Price);
+            logger?.LogInformation("Product {ProductId} with SKU {Sku} created at price {Price}",
+                result.ProductId, result.Sku, result.Price);
+            return result;
         }
 
         public async Task ChangePriceAsync(long id, decimal newPrice, CancellationToken ct)
         {
+            using var activity = ActivitySource.StartActivity("catalog.product.change-price");
+            activity?.SetTag("product.id", id);
             var product = await GetActiveAsync(id, ct);
             product.ChangePrice(newPrice, "api");           // правило "ціна > 0" перевіряє сутність
             await uow.SaveChangesAsync(ct);
+            logger?.LogInformation("Product {ProductId} price changed to {Price}", id, newPrice);
         }
 
         public async Task RemoveStockAsync(long id, int quantity, CancellationToken ct)
         {
+            using var activity = ActivitySource.StartActivity("catalog.product.remove-stock");
+            activity?.SetTag("product.id", id);
+            activity?.SetTag("product.quantity", quantity);
             var product = await GetActiveAsync(id, ct);
             product.RemoveStock(quantity, "api");           // нестача залишку -> DomainException
             await uow.SaveChangesAsync(ct);
+            logger?.LogInformation("Stock reduced by {Quantity} for product {ProductId}", quantity, id);
         }
 
         public async Task DeleteAsync(long id, CancellationToken ct)

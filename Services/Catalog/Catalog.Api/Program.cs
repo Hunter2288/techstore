@@ -6,19 +6,9 @@ using Catalog.Dal;
 using Catalog.Dal.Interfaces;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
-using Serilog.Context;
 
 var builder = WebApplication.CreateBuilder(args);
-
-const string logTemplate =
-    "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}";
-
-builder.Host.UseSerilog((ctx, cfg) => cfg
-    .ReadFrom.Configuration(ctx.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console(outputTemplate: logTemplate)
-    .WriteTo.File("logs/catalog-.log", rollingInterval: RollingInterval.Day, outputTemplate: logTemplate));
+builder.AddServiceDefaults();
 
 builder.Services.AddDbContext<CatalogDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("CatalogDb")));
@@ -49,20 +39,8 @@ using (var scope = app.Services.CreateScope())
     if (!app.Environment.IsProduction())
         await DbInitializer.SeedAsync(db);
 }
-app.Use(async (ctx, next) =>
-{
-    var correlationId = ctx.Request.Headers["X-Correlation-Id"].FirstOrDefault() ?? ctx.TraceIdentifier;
-    ctx.Response.Headers["X-Correlation-Id"] = correlationId;
-    using (LogContext.PushProperty("CorrelationId", correlationId))
-    using (LogContext.PushProperty("RequestPath", ctx.Request.Path.Value))
-    using (LogContext.PushProperty("UserId", ctx.User.Identity?.Name ?? "anonymous"))
-    {
-        await next();
-    }
-});
-
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
-app.UseSerilogRequestLogging();
 
 if (app.Environment.IsDevelopment())
 {
@@ -71,4 +49,5 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapDefaultEndpoints();
 app.Run();

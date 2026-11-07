@@ -18,6 +18,8 @@ public enum ReviewDeleteStatus
 
 public interface IReviewRepository
 {
+    Task<bool> ExistsAsync(int productId, long authorId, CancellationToken cancellationToken = default);
+
     Task AddAsync(
         Review review,
         CancellationToken cancellationToken = default);

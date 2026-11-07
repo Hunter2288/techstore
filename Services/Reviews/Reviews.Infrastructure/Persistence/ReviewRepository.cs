@@ -3,7 +3,6 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using Reviews.Domain.Entities;
 using Reviews.Domain.Interfaces;
-using global::Reviews.Domain.Interfaces;
 
 namespace Reviews.Infrastructure.Persistence;
 
@@ -14,6 +13,13 @@ public sealed class ReviewRepository : IReviewRepository
     public ReviewRepository(MongoDbContext context)
     {
         _context = context;
+    }
+
+    public Task<bool> ExistsAsync(int productId, long authorId, CancellationToken cancellationToken = default)
+    {
+        var filter = Builders<ReviewDocument>.Filter.Eq(x => x.ProductId, productId) &
+                     Builders<ReviewDocument>.Filter.Eq("author.userId", authorId);
+        return _context.Reviews.Find(filter).AnyAsync(cancellationToken);
     }
 
     public async Task AddAsync(Review review, CancellationToken cancellationToken = default)

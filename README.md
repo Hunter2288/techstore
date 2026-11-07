@@ -74,14 +74,15 @@ SQL_PASS='<пароль sa>' ./deploy.sh          # Linux/macOS/WSL
 ![Reviews](docs/erd-reviews.png)
 
 
-## Лаб. 02–03: мікросервіси Orders та Catalog
+## Лаб. 02–05: мікросервіси й Aspire-платформа
 
-Рішення `Platform.slnx` містить два сервіси та Aspire AppHost:
+Рішення `Platform.slnx` містить три бізнес-сервіси, Aspire AppHost, спільні ServiceDefaults, YARP Gateway та Aggregator:
 
 | Сервіс | Проєкт №  | Доступ до даних | База |
 |---|---|---|---|
 | `Services/Orders` | 1 | ADO.NET + Dapper, Unit of Work | `TechStore_Orders` (SQL-скрипти з `db/p1`) |
 | `Services/Catalog` | 2 | EF Core (Code-First), Unit of Work | `TechStore_CatalogEf` (створюється міграціями) |
+| `Services/Reviews` | 3 | Clean Architecture, CQRS, MongoDB | `TechStore_Reviews` |
 
 Шари кожного сервісу: `*.Api` → `*.Bll` → `*.Dal`, спільні моделі та винятки в `*.Domain`.
 
@@ -111,14 +112,14 @@ SQL-скрипт усіх міграцій: `Services/Catalog/Catalog.Dal/Migrat
 тож повторний запуск не створює дублів.
 
 ### Запуск через Aspire
-Рядки підключення задано в `Platform.AppHost/appsettings.json` (`OrdersDb`, `CatalogDb`);
-Aspire передає їх сервісам як `ConnectionStrings__OrdersDb` / `ConnectionStrings__CatalogDb`.
+У `Platform.AppHost/AppHost.cs` оголошені SQL Server і MongoDB з постійними volume. Aspire передає сервіcам рядки підключення `OrdersDb`, `CatalogDb` і `ReviewsDb` через `WithReference`.
+Задайте секрет SQL Server і запустіть платформу:
 ```powershell
-dotnet dev-certs https --trust
+dotnet user-secrets set "Parameters:sql-password" "Use-a-strong-password-123!" --project Platform.AppHost
 dotnet run --project Platform.AppHost
 ```
-У консолі буде посилання на Aspire Dashboard: ресурси `orders-api` і `catalog-api` мають статус Running.
-Swagger кожного сервісу: `<URL з Dashboard>/swagger`.
+Dashboard має показати SQL Server, MongoDB, `orders-api`, `catalog-api`, `reviews-api`, `aggregator` і `gateway` у статусі Running. Клієнтський Gateway: `http://localhost:5000`; API маршрути: `/api/orders`, `/api/products`, `/api/reviews`, `/api/aggregator/orders/{id}/full`.
+JWT validation у Gateway вмикається через конфігурацію `Authentication:Jwt:Authority`, `Audience` і `RequireAuthentication`; за замовчуванням auth вимкнений для локальної демонстрації.
 
 Один сервіс без Aspire:
 ```powershell
@@ -177,3 +178,40 @@ curl -X POST https://localhost:PORT/api/orders/2/payments -H "Content-Type: appl
 
 Залишок товару (`StockQuantity`) зберігається лише в Catalog і ніде не дублюється.
 
+## Lab 05: .NET Aspire platform
+
+The solution includes `Platform.AppHost`, shared `Platform.ServiceDefaults`, `Platform.ApiGateway`, and `Platform.Aggregator`. Aspire starts SQL Server and MongoDB with persistent data volumes and wires the existing Orders, Catalog, and Reviews APIs to their databases using connection string references.
+
+### Run locally
+
+1. Start Docker Desktop.
+2. Set the SQL Server `sa` password once from the repository root:
+
+   ```powershell
+   dotnet user-secrets set "Parameters:sql-password" "Use-a-strong-password-123!" --project Platform.AppHost
+   ```
+
+3. Start the platform:
+
+   ```powershell
+   dotnet run --project Platform.AppHost
+   ```
+
+Aspire opens its Dashboard. The public Gateway listens on `http://localhost:5000`. Example routes are `/api/orders`, `/api/products`, `/api/reviews`, and `/api/aggregator/orders/{id}/full`. The Gateway assigns/forwards `X-Correlation-Id`; the Aggregator fans out catalog and review lookups in parallel and includes unavailable-service warnings in its response.
+
+The Catalog schema is created by EF migrations, Reviews creates its indexes and seed data at startup, and Orders bootstraps its schema, procedures, and seed data from the idempotent Lab 02 scripts in `db/p1` when the API starts.
+
+### Lab 05: requests through the Gateway
+
+Run these examples after the AppHost resources are healthy. Use `curl.exe` in PowerShell so `curl` is not interpreted as the PowerShell alias.
+
+```powershell
+# Product list through YARP Gateway; expected: 200 OK with a paged JSON response.
+curl.exe -i "http://localhost:5000/api/products?page=1&pageSize=10"
+
+# Full order card through Gateway -> Aggregator -> Orders, Catalog, Reviews.
+# Expected: 200 OK with order/products/reviews/warnings; 404 if order 1 does not exist.
+curl.exe -i "http://localhost:5000/api/aggregator/orders/1/full"
+```
+
+The second response contains partial data and a `warnings` entry if Catalog or Reviews is unavailable. Both requests include the Gateway-generated `X-Correlation-Id` response header.
