@@ -1,4 +1,6 @@
 using Catalog.Api.ExceptionHandling;
+using Catalog.Api.Grpc;
+using Catalog.Bll.Caching;
 using Catalog.Bll.Mapping;
 using Catalog.Bll.Services;
 using Catalog.Bll.Validators;
@@ -6,14 +8,21 @@ using Catalog.Dal;
 using Catalog.Dal.Interfaces;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
+builder.WebHost.ConfigureKestrel(options => options.ConfigureEndpointDefaults(
+    endpoint => endpoint.Protocols = HttpProtocols.Http1AndHttp2));
+builder.AddRedisDistributedCache("redis");
+builder.Services.AddMemoryCache(options => options.SizeLimit = 10_000);
+builder.Services.AddSingleton<CacheMetrics>();
 
 builder.Services.AddDbContext<CatalogDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("CatalogDb")));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ProductService>();
+builder.Services.AddScoped<IProductService, CachedProductService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 
 builder.Services.AddAutoMapper(cfg =>
@@ -24,6 +33,7 @@ builder.Services.AddAutoMapper(cfg =>
 builder.Services.AddValidatorsFromAssemblyContaining<CreateProductDtoValidator>();
 
 builder.Services.AddControllers();
+builder.Services.AddGrpc(options => options.Interceptors.Add<LoggingInterceptor>());
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
     ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
@@ -49,5 +59,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapGrpcService<CatalogGrpcService>();
 app.MapDefaultEndpoints();
 app.Run();

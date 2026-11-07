@@ -66,25 +66,18 @@ CREATE TABLE dbo.ProductCategories (
 );
 GO
 
--- IX_Products_Brand: товари бренду (фільтр у каталозі, індекс під FK)
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Products_Brand' AND object_id=OBJECT_ID('dbo.Products'))
     CREATE INDEX IX_Products_Brand ON dbo.Products (BrandId);
--- IX_Products_Name: пошук товару за початком назви
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Products_Name' AND object_id=OBJECT_ID('dbo.Products'))
     CREATE INDEX IX_Products_Name ON dbo.Products (Name);
--- IX_Products_Active_Price: сторінка каталогу: активні товари, сортування за ціною, пагінація
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Products_Active_Price' AND object_id=OBJECT_ID('dbo.Products'))
     CREATE INDEX IX_Products_Active_Price ON dbo.Products (Price) INCLUDE (Name) WHERE IsActive = 1 AND IsDeleted = 0;
--- IX_Images_Product: усі зображення товару
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Images_Product' AND object_id=OBJECT_ID('dbo.ProductImages'))
     CREATE INDEX IX_Images_Product ON dbo.ProductImages (ProductId);
--- UX_Images_OneMain: гарантує одне головне зображення на товар
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_Images_OneMain' AND object_id=OBJECT_ID('dbo.ProductImages'))
     CREATE UNIQUE INDEX UX_Images_OneMain ON dbo.ProductImages (ProductId) WHERE IsMain = 1;
--- IX_PC_Category: товари певної категорії (зворотний бік M:N)
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_PC_Category' AND object_id=OBJECT_ID('dbo.ProductCategories'))
     CREATE INDEX IX_PC_Category ON dbo.ProductCategories (CategoryId);
--- UX_PC_OnePrimary: гарантує одну основну категорію на товар
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_PC_OnePrimary' AND object_id=OBJECT_ID('dbo.ProductCategories'))
     CREATE UNIQUE INDEX UX_PC_OnePrimary ON dbo.ProductCategories (ProductId) WHERE IsPrimary = 1;
 GO

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -8,9 +8,8 @@ namespace Catalog.Dal
     {
         public static async Task SeedAsync(CatalogDbContext db, CancellationToken ct = default)
         {
-            if (await db.Products.AnyAsync(ct)) return;            // уже наповнено
+            if (await db.Products.AnyAsync(ct)) return;
 
-            // Sku, Name, Price, Stock, BrandId, CategoryId (довідники з HasData)
             var items = new (string Sku, string Name, decimal Price, int Stock, long BrandId, long CategoryId)[]
             {
             ("SM-S24",  "Смартфон Samsung Galaxy S24",       31999m, 15, 1, 2),
@@ -38,7 +37,7 @@ namespace Catalog.Dal
                 product.ProductCategories.Add(new ProductCategory { CategoryId = categoryId, IsPrimary = true, SortOrder = 0 });
                 product.ProductCategories.Add(new ProductCategory { CategoryId = 1, IsPrimary = false, SortOrder = 1 });
 
-                if (i < 3)                                            // деталі лише для перших трьох
+                if (i < 3)
                     product.SetDetail(new ProductDetail
                     {
                         Description = name,
@@ -55,7 +54,7 @@ namespace Catalog.Dal
                 db.Products.Add(product);
             }
 
-            await db.SaveChangesAsync(ct);                            // один виклик, одна транзакція
+            await db.SaveChangesAsync(ct);
         }
     }
 }

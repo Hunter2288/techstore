@@ -1,4 +1,4 @@
-﻿using Catalog.Domain.Models;
+using Catalog.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
@@ -14,7 +14,7 @@ namespace Catalog.Dal.Configurations
             builder.ToTable("ProductImages");
             builder.HasKey(i => i.ImageId);
             builder.Property(i => i.Url).IsRequired().HasMaxLength(500);
-            builder.HasIndex(i => i.ProductId).IsUnique()                 // одне головне фото
+            builder.HasIndex(i => i.ProductId).IsUnique()
                 .HasDatabaseName("UX_Images_OneMain")
                 .HasFilter("[IsMain] = 1");
         }

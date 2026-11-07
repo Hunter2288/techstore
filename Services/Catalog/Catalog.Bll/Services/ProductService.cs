@@ -1,4 +1,4 @@
-﻿using Catalog.Bll.Dto;
+using Catalog.Bll.Dto;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -42,7 +42,7 @@ namespace Catalog.Bll.Services
             using var activity = ActivitySource.StartActivity("catalog.product.change-price");
             activity?.SetTag("product.id", id);
             var product = await GetActiveAsync(id, ct);
-            product.ChangePrice(newPrice, "api");           // правило "ціна > 0" перевіряє сутність
+            product.ChangePrice(newPrice, "api");
             await uow.SaveChangesAsync(ct);
             logger?.LogInformation("Product {ProductId} price changed to {Price}", id, newPrice);
         }
@@ -53,7 +53,7 @@ namespace Catalog.Bll.Services
             activity?.SetTag("product.id", id);
             activity?.SetTag("product.quantity", quantity);
             var product = await GetActiveAsync(id, ct);
-            product.RemoveStock(quantity, "api");           // нестача залишку -> DomainException
+            product.RemoveStock(quantity, "api");
             await uow.SaveChangesAsync(ct);
             logger?.LogInformation("Stock reduced by {Quantity} for product {ProductId}", quantity, id);
         }

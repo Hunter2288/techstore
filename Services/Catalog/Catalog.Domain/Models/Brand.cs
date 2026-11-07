@@ -1,4 +1,4 @@
-﻿using Catalog.Domain.Exceptions;
+using Catalog.Domain.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -12,7 +12,7 @@ namespace Catalog.Domain.Models
         public string? Country { get; private set; }
         public List<Product> Products { get; } = new();
 
-        private Brand() { }                                   // для EF Core
+        private Brand() { }
         public Brand(string name, string? country = null)
         {
             if (string.IsNullOrWhiteSpace(name)) throw new DomainException("Brand name is required");

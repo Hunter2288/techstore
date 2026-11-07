@@ -1,14 +1,20 @@
 using System.Text.Json.Serialization;
-using Platform.Aggregator.Clients;
+using Catalog.Grpc;
+using Orders.Grpc;
+using Reviews.Grpc;
 using Platform.Aggregator.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
+builder.AddRedisDistributedCache("redis");
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull);
-builder.Services.AddHttpClient<OrdersClient>(client => client.BaseAddress = new Uri("https+http://orders-api"));
-builder.Services.AddHttpClient<CatalogClient>(client => client.BaseAddress = new Uri("https+http://catalog-api"));
-builder.Services.AddHttpClient<ReviewsClient>(client => client.BaseAddress = new Uri("https+http://reviews-api"));
+builder.Services.AddGrpcClient<OrdersService.OrdersServiceClient>(options =>
+    options.Address = new Uri("https+http://orders-api"));
+builder.Services.AddGrpcClient<CatalogService.CatalogServiceClient>(options =>
+    options.Address = new Uri("https+http://catalog-api"));
+builder.Services.AddGrpcClient<ReviewsService.ReviewsServiceClient>(options =>
+    options.Address = new Uri("https+http://reviews-api"));
 builder.Services.AddScoped<FullOrderService>();
 
 var app = builder.Build();

@@ -1,7 +1,6 @@
 
 db = db.getSiblingDB("TechStore_Reviews");
 
-// Демонстрація міграції схеми, оптимістичної конкурентності та запитів
 db.reviews.updateMany(
   { schemaVersion: { $lt: 2 } },
   { $set: { helpfulVotes: NumberInt(0), schemaVersion: NumberInt(2) } }

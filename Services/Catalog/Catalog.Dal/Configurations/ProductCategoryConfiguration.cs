@@ -1,4 +1,4 @@
-﻿using Catalog.Domain.Models;
+using Catalog.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
@@ -12,9 +12,9 @@ namespace Catalog.Dal.Configurations
         public void Configure(EntityTypeBuilder<ProductCategory> builder)
         {
             builder.ToTable("ProductCategories");
-            builder.HasKey(pc => new { pc.ProductId, pc.CategoryId });    // складений ключ
+            builder.HasKey(pc => new { pc.ProductId, pc.CategoryId });
             builder.Property(pc => pc.AddedAt).HasDefaultValueSql("SYSUTCDATETIME()");
-            builder.HasIndex(pc => pc.ProductId).IsUnique()               // одна основна категорія
+            builder.HasIndex(pc => pc.ProductId).IsUnique()
                 .HasDatabaseName("UX_PC_OnePrimary")
                 .HasFilter("[IsPrimary] = 1");
             builder.HasOne(pc => pc.Product).WithMany(p => p.ProductCategories)

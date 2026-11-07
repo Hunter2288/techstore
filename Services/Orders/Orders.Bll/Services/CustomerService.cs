@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Orders.Bll.Dto;
 using Orders.Dal.Interfaces;
 using Orders.Domain.Exceptions;
@@ -22,7 +22,7 @@ namespace Orders.Bll.Services
         {
             var entity = mapper.Map<Customer>(input);
             entity.CreatedBy = "api";
-            var id = await Uow.Customers.AddAsync(entity, ct);      // дубль Email -> 2627 -> 409
+            var id = await Uow.Customers.AddAsync(entity, ct);
             return await GetByIdAsync(id, ct);
         }
 

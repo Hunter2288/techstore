@@ -30,17 +30,10 @@ if (!exists("reviews")) db.createCollection("reviews", { validator: reviewsValid
 else db.runCommand({ collMod: "reviews", validator: reviewsValidator });
 ["discussions", "comments", "ratings"].forEach(n => { if (!exists(n)) db.createCollection(n); });
 
-// відгуки товару, нові першими
 db.reviews.createIndex({ productId: 1, createdAt: -1 });
-// відгуки автора
 db.reviews.createIndex({ "author.userId": 1 });
-// один відгук автора на товар
 db.reviews.createIndex({ productId: 1, "author.userId": 1 }, { unique: true });
-// дискусії товару
 db.discussions.createIndex({ productId: 1, createdAt: -1 });
-// коментарі дискусії у хронології
 db.comments.createIndex({ discussionId: 1, createdAt: 1 });
-// відповіді на коментар
 db.comments.createIndex({ parentId: 1 });
-// один рейтинг на товар, швидке читання
 db.ratings.createIndex({ productId: 1 }, { unique: true });

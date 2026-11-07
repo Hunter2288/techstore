@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Orders.Dal.Interfaces;
 using Orders.Dal.Repositories;
 using System;
@@ -43,7 +43,7 @@ namespace Orders.Dal
         {
             if (_transaction is null) return;
             try { await _transaction.RollbackAsync(ct); }
-            catch (InvalidOperationException) { /* сервер уже відкотив (XACT_ABORT у процедурі) */ }
+            catch (InvalidOperationException) {  }
             await _transaction.DisposeAsync();
             _transaction = null;
         }

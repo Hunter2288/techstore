@@ -1,4 +1,4 @@
-﻿using Catalog.Domain.Models;
+using Catalog.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
@@ -27,7 +27,7 @@ namespace Catalog.Dal.Configurations
 
             builder.HasIndex(p => p.Sku).IsUnique();
             builder.HasIndex(p => p.Name);
-            builder.HasIndex(p => p.Price)                                // сторінка каталогу
+            builder.HasIndex(p => p.Price)
                 .HasDatabaseName("IX_Products_Active_Price")
                 .IncludeProperties(p => p.Name)
                 .HasFilter("[IsActive] = 1 AND [IsDeleted] = 0");
@@ -35,10 +35,10 @@ namespace Catalog.Dal.Configurations
             builder.HasOne(p => p.Brand).WithMany(b => b.Products)
                 .HasForeignKey(p => p.BrandId)
                 .OnDelete(DeleteBehavior.Restrict);
-            builder.HasOne(p => p.Detail).WithOne()                       // 1:1
+            builder.HasOne(p => p.Detail).WithOne()
                 .HasForeignKey<ProductDetail>(d => d.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
-            builder.HasMany(p => p.Images).WithOne()                      // 1:N
+            builder.HasMany(p => p.Images).WithOne()
                 .HasForeignKey(i => i.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
         }

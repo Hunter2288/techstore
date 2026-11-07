@@ -4,9 +4,15 @@ using Orders.Bll.Mapping;
 using Orders.Bll.Services;
 using Orders.Dal;
 using Orders.Dal.Interfaces;
+using Orders.Api.Grpc;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
+builder.WebHost.ConfigureKestrel(options => options.ConfigureEndpointDefaults(
+    endpoint => endpoint.Protocols = HttpProtocols.Http1AndHttp2));
+builder.AddRedisDistributedCache("redis");
+builder.Services.AddMemoryCache(options => options.SizeLimit = 10_000);
 
 var connectionString = builder.Configuration.GetConnectionString("OrdersDb")
     ?? throw new InvalidOperationException("Connection string 'OrdersDb' is missing");
@@ -25,6 +31,7 @@ builder.Services.AddAutoMapper(cfg =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddGrpc(options => options.Interceptors.Add<LoggingInterceptor>());
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
     ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
@@ -44,5 +51,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapGrpcService<OrdersGrpcService>();
 app.MapDefaultEndpoints();
 app.Run();

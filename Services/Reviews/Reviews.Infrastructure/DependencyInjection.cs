@@ -51,7 +51,6 @@ public static class DependencyInjection
         services.AddScoped<IReviewRepository>(sp => sp.GetRequiredService<ReviewRepository>());
         services.AddScoped<IReviewQueries>(sp => sp.GetRequiredService<ReviewQueries>());
 
-        // Hosted services стартують у порядку реєстрації.
         services.AddHostedService<SchemaMigrationService>();
         services.AddHostedService<IndexCreationService>();
         services.AddHostedService<ReviewSeeder>();

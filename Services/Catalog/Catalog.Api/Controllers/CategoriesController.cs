@@ -1,4 +1,4 @@
-﻿using Catalog.Bll.Dto;
+using Catalog.Bll.Dto;
 using Catalog.Bll.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,7 +13,7 @@ namespace Catalog.Api.Controllers
         public async Task<ActionResult<IReadOnlyList<CategoryDto>>> GetAll(CancellationToken ct)
             => Ok(await service.GetAllAsync(ct));
 
-        [HttpGet("{id:long}/products")]                                   // Explicit Loading
+        [HttpGet("{id:long}/products")]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<CategoryWithProductsDto>> GetWithProducts(long id, CancellationToken ct)
             => Ok(await service.GetWithProductsAsync(id, ct));

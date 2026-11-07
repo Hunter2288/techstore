@@ -154,7 +154,6 @@ public sealed class ReviewSeeder : IHostedService
         }
         catch (MongoWriteException ex) when (ex.WriteError?.Code == 11000)
         {
-            // Інший екземпляр застосунку міг вставити той самий seed паралельно.
         }
     }
 
@@ -172,7 +171,6 @@ public sealed class ReviewSeeder : IHostedService
         }
         catch (MongoWriteException ex) when (ex.WriteError?.Code == 11000)
         {
-            // Ідемпотентний seed: дублікат означає, що запис уже додано.
         }
     }
 
@@ -189,7 +187,6 @@ public sealed class ReviewSeeder : IHostedService
         }
         catch (MongoWriteException ex) when (ex.WriteError?.Code == 11000)
         {
-            // Унікальний індекс productId захищає від дубля за паралельного запуску.
         }
     }
 

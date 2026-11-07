@@ -110,22 +110,16 @@ CREATE TABLE dbo.OrderPromotions (
 );
 GO
 
--- IX_Orders_Active: список живих замовлень клієнта, нові першими (фільтрований, без IsDeleted=1)
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Orders_Active' AND object_id=OBJECT_ID('dbo.Orders'))
     CREATE INDEX IX_Orders_Active ON dbo.Orders (CustomerId, CreatedAt DESC) WHERE IsDeleted = 0;
--- IX_Orders_Status: панель менеджера: замовлення за статусом (покриває CreatedAt, TotalAmount)
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Orders_Status' AND object_id=OBJECT_ID('dbo.Orders'))
     CREATE INDEX IX_Orders_Status ON dbo.Orders (Status) INCLUDE (CreatedAt, TotalAmount);
--- IX_OrderItems_ProductId: пошук замовлень, що містять товар (звіти, перевірка перед змінами товару)
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_OrderItems_ProductId' AND object_id=OBJECT_ID('dbo.OrderItems'))
     CREATE INDEX IX_OrderItems_ProductId ON dbo.OrderItems (ProductId);
--- IX_History_Order_ChangedAt: хронологія змін статусу одного замовлення (usp_GetOrderDetails)
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_History_Order_ChangedAt' AND object_id=OBJECT_ID('dbo.OrderStatusHistory'))
     CREATE INDEX IX_History_Order_ChangedAt ON dbo.OrderStatusHistory (OrderId, ChangedAt);
--- IX_Payments_OrderId: платежі замовлення; перевірка Succeeded у usp_ChangeOrderStatus
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_Payments_OrderId' AND object_id=OBJECT_ID('dbo.PaymentRecords'))
     CREATE INDEX IX_Payments_OrderId ON dbo.PaymentRecords (OrderId);
--- IX_OrderPromotions_Promo: використання акції в замовленнях (звіти, індекс під FK)
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_OrderPromotions_Promo' AND object_id=OBJECT_ID('dbo.OrderPromotions'))
     CREATE INDEX IX_OrderPromotions_Promo ON dbo.OrderPromotions (PromotionId);
 GO

@@ -1,4 +1,4 @@
-﻿using Catalog.Bll.Dto;
+using Catalog.Bll.Dto;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -12,8 +12,8 @@ namespace Catalog.Bll.Mapping
             CreateMap<Product, ProductDto>();
             CreateMap<ProductDetail, ProductDetailDto>();
             CreateMap<ProductImage, ProductImageDto>();
-            CreateMap<ProductCategory, ProductCategoryDto>();      // CategoryName <- Category.Name
-            CreateMap<Product, ProductCardDto>()                   // BrandName <- Brand.Name
+            CreateMap<ProductCategory, ProductCategoryDto>();
+            CreateMap<Product, ProductCardDto>()
                 .ForCtorParam("Categories", o => o.MapFrom(s => s.ProductCategories));
 
             CreateMap<Category, CategoryDto>();

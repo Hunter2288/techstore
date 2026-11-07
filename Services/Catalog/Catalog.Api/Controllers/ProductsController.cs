@@ -1,4 +1,4 @@
-﻿using Catalog.Bll.Dto;
+using Catalog.Bll.Dto;
 using Catalog.Bll.Services;
 using Catalog.Domain.Models;
 using FluentValidation;
@@ -11,8 +11,6 @@ namespace Catalog.Api.Controllers
     [Produces("application/json")]
     public class ProductsController(IProductService service) : ControllerBase
     {
-        // метадані пагінації: у тілі (items, totalCount, page, pageSize, totalPages, hasNext, hasPrevious)
-        // і дублюються в заголовках X-Total-Count та X-Total-Pages
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<PagedResult<ProductDto>>> GetList(
@@ -24,12 +22,12 @@ namespace Catalog.Api.Controllers
             return Ok(result);
         }
 
-        [HttpGet("{id:long}")]                                            // Eager Loading
+        [HttpGet("{id:long}")]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<ProductCardDto>> GetById(long id, CancellationToken ct)
             => Ok(await service.GetByIdAsync(id, ct));
 
-        [HttpGet("recent")]                                               // LINQ через M:N
+        [HttpGet("recent")]
         public async Task<ActionResult<IReadOnlyList<ProductDto>>> GetRecent(
             [FromQuery] string category, [FromQuery] int days = 30, CancellationToken ct = default)
             => Ok(await service.GetRecentlyAddedAsync(category, days, ct));

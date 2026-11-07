@@ -1,11 +1,11 @@
-﻿using Catalog.Domain.Exceptions;
+using Catalog.Domain.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Catalog.Domain.Models
 {
-    public class Product                                       // аналог CatalogItem з eShop
+    public class Product
     {
         public long ProductId { get; private set; }
         public string Sku { get; private set; } = "";
@@ -22,9 +22,9 @@ namespace Catalog.Domain.Models
         public bool IsDeleted { get; private set; }
         public byte[] RowVersion { get; private set; } = [];
 
-        public ProductDetail? Detail { get; private set; }                 // 1:1
-        public List<ProductImage> Images { get; } = new();                 // 1:N
-        public List<ProductCategory> ProductCategories { get; } = new();   // M:N
+        public ProductDetail? Detail { get; private set; }
+        public List<ProductImage> Images { get; } = new();
+        public List<ProductCategory> ProductCategories { get; } = new();
 
         private Product() { }
         public Product(string name, string sku, decimal price, long brandId, string? createdBy = null)

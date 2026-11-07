@@ -1,7 +1,6 @@
 
 db = db.getSiblingDB("TechStore_Reviews");
 
-// Ідемпотентний seed: replaceOne з upsert за фіксованими _id
 const RID1 = ObjectId("66f0c2000000000000000001"), RID2 = ObjectId("66f0c2000000000000000002");
 const DID  = ObjectId("66f0c3000000000000000001");
 const CID1 = ObjectId("66f0c4000000000000000001"), CID2 = ObjectId("66f0c4000000000000000002");

@@ -215,3 +215,20 @@ curl.exe -i "http://localhost:5000/api/aggregator/orders/1/full"
 ```
 
 The second response contains partial data and a `warnings` entry if Catalog or Reviews is unavailable. Both requests include the Gateway-generated `X-Correlation-Id` response header.
+
+## Lab 06: gRPC and two-level caching
+
+Aspire also starts a persistent Redis resource named `redis`. Catalog, Orders, Reviews, and Aggregator receive its connection string through service discovery. Catalog product cards use a 45-second in-memory L1 cache and a 10-minute Redis L2 cache; successful product writes invalidate the product key. If Redis is unavailable, Catalog and Aggregator continue with database/live calls and log the cache failure.
+
+The internal read contracts are in `Services/Catalog/Catalog.Api/Protos`, `Services/Orders/Orders.Api/Protos`, and `Services/Reviews/Reviews.WebApi/Protos`. Their APIs serve gRPC over HTTP/2, and Aggregator uses generated typed gRPC clients for Orders, Catalog, and Reviews. The public routes remain HTTP through Gateway:
+
+```powershell
+# Public HTTP route; internally Aggregator calls the three services over gRPC.
+curl.exe -i "http://localhost:5000/api/aggregator/orders/1/full"
+
+# Change a product, then read it again to observe cache invalidation.
+curl.exe -i -X PUT "http://localhost:5000/api/products/1/price" -H "Content-Type: application/json" -d '{"price":12345}'
+curl.exe -i "http://localhost:5000/api/products/1"
+```
+
+Look for `cache.hits`, `cache.misses`, and `cache.invalidations` under the `Catalog.Cache` meter and gRPC spans in the Aspire Dashboard.

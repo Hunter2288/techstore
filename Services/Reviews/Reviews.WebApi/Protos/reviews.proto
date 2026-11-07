@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option csharp_namespace = "Reviews.Grpc";
+package reviews;
+
+service ReviewsService {
+  rpc GetForProduct (GetForProductRequest) returns (ReviewsReply);
+}
+
+message GetForProductRequest { int64 product_id = 1; }
+message ReviewReply {
+  string id = 1;
+  int32 product_id = 2;
+  string product_name = 3;
+  int32 rating = 4;
+  string title = 5;
+  string text = 6;
+}
+message ReviewsReply { repeated ReviewReply reviews = 1; }
