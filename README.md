@@ -232,3 +232,21 @@ curl.exe -i "http://localhost:5000/api/products/1"
 ```
 
 Look for `cache.hits`, `cache.misses`, and `cache.invalidations` under the `Catalog.Cache` meter and gRPC spans in the Aspire Dashboard.
+
+## Lab 07: resilience, business metrics, and health checks
+
+`Platform.ServiceDefaults` keeps one standard HTTP resilience handler for factory-created HTTP clients (including the transport clients used by gRPC). Do not add a second standard handler to a client. gRPC application statuses travel in trailers, so Aggregator also configures the gRPC channel retry policy for `Unavailable`; call deadlines bound total wait time. These retries are restricted to the read-only Aggregator calls.
+
+| Aggregator dependency | gRPC maximum attempts | Deadline | Circuit breaker / fallback |
+|---|---:|---:|---|
+| Orders | 5 | 8 s | Orders is required to build a card; its failure returns an error |
+| Catalog | 5 | 8 s | Polly breaker opens at 50% failures after at least 4 calls in a 30 s sample; remains open 15 s; card returns with an empty product list and warning |
+| Reviews | 2 | 3 s | Polly breaker opens at 70% failures after at least 8 calls in a 15 s sample; remains open 5 s; card returns with partial data and warning |
+
+Catalog gets more retry budget and a quicker breaker because product details are central to the card. Reviews are optional, so the Aggregator spends less time retrying and degrades to a partial response sooner. The circuit breakers use Polly's ratio and sampling window, with transition logs and `resilience.grpc.circuit.events` (`event.name`: `OnCircuitOpened`, `OnCircuitHalfOpened`, `OnCircuitClosed`). Polly's `resilience.polly.strategy.events` remains available for the standard HTTP handler; gRPC status retries are managed by the gRPC channel policy and are bounded by each call deadline.
+
+Redis stays an optional cache dependency. Catalog's existing cache layer falls back to SQL on Redis read/write failures; the health check reports Redis as `Degraded`. SQL Server and MongoDB checks use lightweight `SELECT 1` and `ping` operations. `/health/live` checks only the process, while `/health/ready` includes tagged database, cache, and (in Aggregator) downstream gRPC checks; the ready response includes each check's result as JSON. `/health` remains the complete ASP.NET health report and `/alive` remains available for compatibility.
+
+Orders, Catalog, Reviews, and Aggregator expose meters `Orders.Api`, `Catalog.Api`, `Reviews.Api`, and `Aggregator.Api`. Business counters include `orders.created`, `orders.confirmed`, `products.created`, `products.updated`, `reviews.created`, and `orders.aggregation.requests`; histograms record operation durations, and Reviews exposes `reviews.requests.inflight`. Meter names are subscribed in ServiceDefaults alongside `Catalog.Cache` and Polly resilience telemetry. Metric tags use bounded operation/result/status values; no entity IDs are attached.
+
+Aspire AppHost probes each API with `WithHttpHealthCheck`, so resource state follows readiness (the Gateway uses liveness). To inspect the signals, run Aspire and open the Dashboard's Metrics, Traces, Logs, and Resources tabs. The local environment should be used to capture the required failure screenshots: stop Reviews to observe retries and partial responses, and stop Redis to observe `Degraded` while requests continue.

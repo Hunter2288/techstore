@@ -6,6 +6,9 @@ using Grpc.Core;
 using Microsoft.Extensions.Caching.Distributed;
 using Orders.Grpc;
 using Reviews.Grpc;
+using Polly;
+using Polly.Registry;
+using Polly.CircuitBreaker;
 
 namespace Platform.Aggregator.Services;
 
@@ -13,6 +16,7 @@ public sealed class FullOrderService(
     OrdersService.OrdersServiceClient orders,
     CatalogService.CatalogServiceClient catalog,
     ReviewsService.ReviewsServiceClient reviews,
+    ResiliencePipelineProvider<string> pipelines,
     IDistributedCache cache,
     ILogger<FullOrderService> logger)
 {
@@ -40,7 +44,8 @@ public sealed class FullOrderService(
         try
         {
             logger.LogInformation("Calling {Service} for {OrderId}", "orders-api", orderId);
-            order = await orders.GetOrderAsync(new GetOrderRequest { Id = orderId }, cancellationToken: cancellationToken);
+            order = await orders.GetOrderAsync(new GetOrderRequest { Id = orderId },
+                deadline: DateTime.UtcNow.AddSeconds(8), cancellationToken: cancellationToken);
         }
         catch (RpcException exception) when (exception.StatusCode == StatusCode.NotFound)
         {
@@ -52,7 +57,8 @@ public sealed class FullOrderService(
         var productsTask = SafeAsync("catalog-api", async () =>
         {
             var result = await catalog.GetProductsByIdsAsync(
-                new GetProductsByIdsRequest { Ids = { productIds } }, cancellationToken: cancellationToken);
+                new GetProductsByIdsRequest { Ids = { productIds } },
+                deadline: DateTime.UtcNow.AddSeconds(8), cancellationToken: cancellationToken);
             return result.Products.Select(product => new ProductDto(product.Id, product.Sku,
                 product.Name, decimal.Parse(product.Price, CultureInfo.InvariantCulture),
                 product.AvailableStock)).ToArray();
@@ -61,7 +67,8 @@ public sealed class FullOrderService(
         var reviewTasks = productIds.Select(productId => SafeAsync("reviews-api", async () =>
         {
             var result = await reviews.GetForProductAsync(
-                new GetForProductRequest { ProductId = productId }, cancellationToken: cancellationToken);
+                new GetForProductRequest { ProductId = productId },
+                deadline: DateTime.UtcNow.AddSeconds(3), cancellationToken: cancellationToken);
             return result.Reviews.Select(review => new ReviewDto(review.Id, review.ProductId,
                 review.ProductName, review.Rating, review.Title, review.Text)).ToArray();
         }, static () => Array.Empty<ReviewDto>(), warnings, cancellationToken));
@@ -105,9 +112,16 @@ public sealed class FullOrderService(
         var timer = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            var value = await call();
+            var value = await pipelines.GetPipeline(service)
+                .ExecuteAsync(_ => new ValueTask<T>(call()), cancellationToken);
             logger.LogInformation("{Service} responded in {ElapsedMs} ms", service, timer.ElapsedMilliseconds);
             return value;
+        }
+        catch (BrokenCircuitException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(exception, "Circuit is open for {Service}; returning fallback", service);
+            warnings.Add($"{service} circuit is open");
+            return fallback();
         }
         catch (RpcException exception) when (!cancellationToken.IsCancellationRequested &&
                                              exception.StatusCode is StatusCode.Unavailable or StatusCode.DeadlineExceeded)

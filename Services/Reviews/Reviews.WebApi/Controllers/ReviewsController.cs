@@ -14,10 +14,12 @@ namespace Reviews.WebApi.Controllers;
 public sealed class ReviewsController : ControllerBase
 {
     private readonly ISender _sender;
+    private readonly ReviewMetrics _metrics;
 
-    public ReviewsController(ISender sender)
+    public ReviewsController(ISender sender, ReviewMetrics metrics)
     {
         _sender = sender;
+        _metrics = metrics;
     }
 
     [HttpGet]
@@ -54,6 +56,7 @@ public sealed class ReviewsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var id = await _sender.Send(command, cancellationToken);
+        _metrics.Created();
         return CreatedAtAction(nameof(GetById), new { id }, new { id });
     }
 

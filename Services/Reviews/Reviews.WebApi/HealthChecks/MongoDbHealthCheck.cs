@@ -2,7 +2,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MongoDB.Bson;
 using Reviews.Infrastructure.Persistence;
 
-namespace Reviews.WebApi.Health;
+namespace Reviews.WebApi.HealthChecks;
 
 public sealed class MongoDbHealthCheck : IHealthCheck
 {

@@ -9,6 +9,9 @@ using Catalog.Dal.Interfaces;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Catalog.Api;
+using Catalog.Api.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
@@ -16,10 +19,19 @@ builder.WebHost.ConfigureKestrel(options => options.ConfigureEndpointDefaults(
     endpoint => endpoint.Protocols = HttpProtocols.Http1AndHttp2));
 builder.AddRedisDistributedCache("redis");
 builder.Services.AddMemoryCache(options => options.SizeLimit = 10_000);
+
+var catalogConnectionString = builder.Configuration.GetConnectionString("CatalogDb")
+    ?? throw new InvalidOperationException("Connection string 'CatalogDb' is missing");
+builder.Services.AddSingleton<CatalogDatabaseHealthCheck>();
+builder.Services.AddHealthChecks()
+    .AddCheck<CatalogDatabaseHealthCheck>("catalog-db", tags: ["database", "sql", "ready"], timeout: TimeSpan.FromSeconds(5))
+    .AddCheck<CatalogRedisHealthCheck>("redis-cache", tags: ["cache", "redis", "ready"], timeout: TimeSpan.FromSeconds(3));
+builder.Services.AddGrpcHealthChecks();
 builder.Services.AddSingleton<CacheMetrics>();
+builder.Services.AddSingleton<CatalogMetrics>();
 
 builder.Services.AddDbContext<CatalogDbContext>(o =>
-    o.UseSqlServer(builder.Configuration.GetConnectionString("CatalogDb")));
+    o.UseSqlServer(catalogConnectionString));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<IProductService, CachedProductService>();
@@ -50,6 +62,13 @@ using (var scope = app.Services.CreateScope())
         await DbInitializer.SeedAsync(db);
 }
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.Use(async (context, next) =>
+{
+    var timer = System.Diagnostics.Stopwatch.StartNew();
+    try { await next(); }
+    finally { app.Services.GetRequiredService<CatalogMetrics>().Record(
+        context.GetEndpoint()?.DisplayName ?? "unmatched", context.Response.StatusCode is >= 200 and < 400, timer.Elapsed.TotalMilliseconds); }
+});
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
@@ -60,5 +79,6 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.MapGrpcService<CatalogGrpcService>();
+app.MapGrpcHealthChecksService();
 app.MapDefaultEndpoints();
 app.Run();

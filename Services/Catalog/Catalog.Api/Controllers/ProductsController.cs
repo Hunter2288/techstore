@@ -9,7 +9,7 @@ namespace Catalog.Api.Controllers
     [ApiController]
     [Route("api/products")]
     [Produces("application/json")]
-    public class ProductsController(IProductService service) : ControllerBase
+    public class ProductsController(IProductService service, CatalogMetrics metrics) : ControllerBase
     {
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -47,6 +47,7 @@ namespace Catalog.Api.Controllers
                 return ValidationProblem(new ValidationProblemDetails(validation.ToDictionary()));
 
             var created = await service.CreateAsync(input, ct);
+            metrics.Created();
             return CreatedAtAction(nameof(GetById), new { id = created.ProductId }, created);
         }
 
@@ -56,6 +57,7 @@ namespace Catalog.Api.Controllers
         public async Task<IActionResult> ChangePrice(long id, ChangePriceDto input, CancellationToken ct)
         {
             await service.ChangePriceAsync(id, input.Price, ct);
+            metrics.Updated("price");
             return NoContent();
         }
 
@@ -66,6 +68,7 @@ namespace Catalog.Api.Controllers
         public async Task<IActionResult> RemoveStock(long id, RemoveStockDto input, CancellationToken ct)
         {
             await service.RemoveStockAsync(id, input.Quantity, ct);
+            metrics.Updated("stock");
             return NoContent();
         }
 
@@ -75,6 +78,7 @@ namespace Catalog.Api.Controllers
         public async Task<IActionResult> Delete(long id, CancellationToken ct)
         {
             await service.DeleteAsync(id, ct);
+            metrics.Updated("delete");
             return NoContent();
         }
     }

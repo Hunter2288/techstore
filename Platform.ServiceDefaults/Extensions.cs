@@ -44,6 +44,7 @@ public static class Extensions
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddMeter("Catalog.Cache")
+                .AddMeter("Orders.Api", "Catalog.Api", "Reviews.Api", "Aggregator.Api", "Polly")
                 .AddRuntimeInstrumentation())
             .WithTracing(tracing => tracing
                 .AddSource(builder.Environment.ApplicationName)
@@ -70,6 +71,23 @@ public static class Extensions
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
         app.MapHealthChecks("/health");
+        app.MapHealthChecks("/health/live", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains("live")
+        });
+        app.MapHealthChecks("/health/ready", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains("ready"),
+            ResponseWriter = async (context, report) =>
+            {
+                context.Response.ContentType = "application/json";
+                var results = report.Entries.ToDictionary(
+                    entry => entry.Key,
+                    entry => new { status = entry.Value.Status.ToString(), description = entry.Value.Description });
+                await System.Text.Json.JsonSerializer.SerializeAsync(context.Response.Body,
+                    new { status = report.Status.ToString(), checks = results });
+            }
+        });
         app.MapHealthChecks("/alive", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains("live")

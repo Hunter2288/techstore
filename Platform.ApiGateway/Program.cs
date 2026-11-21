@@ -1,8 +1,13 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Platform.ApiGateway;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
+builder.Services.AddHttpClient("aggregator-health", client => client.BaseAddress = new Uri("http://aggregator"));
+builder.Services.AddHealthChecks()
+    .AddCheck<AggregatorHealthCheck>("aggregator", tags: ["downstream", "ready"], timeout: TimeSpan.FromSeconds(4));
 var jwt = builder.Configuration.GetSection("Authentication:Jwt");
 var jwtAuthority = jwt["Authority"];
 var jwtAudience = jwt["Audience"];

@@ -7,7 +7,7 @@ namespace Orders.Api.Controllers;
 [ApiController]
 [Route("api/orders")]
 [Produces("application/json")]
-public class OrdersController(IOrderService orders) : ControllerBase
+public class OrdersController(IOrderService orders, OrderMetrics metrics) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<OrderDto>>> GetAll(CancellationToken ct)
@@ -25,6 +25,7 @@ public class OrdersController(IOrderService orders) : ControllerBase
     public async Task<ActionResult<OrderDto>> Create(CreateOrderDto input, CancellationToken ct)
     {
         var created = await orders.CreateAsync(input, ct);
+        metrics.Created(created.Status);
         return CreatedAtAction(nameof(GetById), new { id = created.OrderId }, created);
     }
 
@@ -35,6 +36,7 @@ public class OrdersController(IOrderService orders) : ControllerBase
     public async Task<IActionResult> Confirm(long id, CancellationToken ct)
     {
         await orders.ConfirmOrderAsync(id, ct);
+        metrics.Confirmed("StockConfirmed");
         return NoContent();
     }
 
