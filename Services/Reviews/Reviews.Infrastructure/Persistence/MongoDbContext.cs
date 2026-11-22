@@ -11,6 +11,7 @@ public sealed class MongoDbContext
     public IMongoCollection<BsonDocument> Discussions { get; }
     public IMongoCollection<BsonDocument> Comments { get; }
     public IMongoCollection<BsonDocument> Ratings { get; }
+    public IMongoCollection<BsonDocument> ProcessedEvents { get; }
 
     public MongoDbContext(IMongoClient client, IOptions<MongoDbSettings> options)
     {
@@ -20,5 +21,6 @@ public sealed class MongoDbContext
         Discussions = Database.GetCollection<BsonDocument>("discussions");
         Comments = Database.GetCollection<BsonDocument>("comments");
         Ratings = Database.GetCollection<BsonDocument>("ratings");
+        ProcessedEvents = Database.GetCollection<BsonDocument>("processed_events");
     }
 }

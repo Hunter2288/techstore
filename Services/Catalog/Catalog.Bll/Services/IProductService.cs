@@ -11,6 +11,7 @@ namespace Catalog.Bll.Services
         Task<ProductCardDto> GetByIdAsync(long id, CancellationToken ct);
         Task<ProductDto> CreateAsync(CreateProductDto input, CancellationToken ct);
         Task ChangePriceAsync(long id, decimal newPrice, CancellationToken ct);
+        Task RenameAsync(long id, string newName, CancellationToken ct);
         Task RemoveStockAsync(long id, int quantity, CancellationToken ct);
         Task DeleteAsync(long id, CancellationToken ct);
         Task<PagedResult<ProductDto>> GetListAsync(ProductQuery query, CancellationToken ct);

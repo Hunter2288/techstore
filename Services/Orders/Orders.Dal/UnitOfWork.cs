@@ -19,11 +19,15 @@ namespace Orders.Dal
             Customers = new CustomerRepository(_connection, () => _transaction);
             Orders = new OrderRepository(_connection, () => _transaction);
             Payments = new PaymentRepository(_connection, () => _transaction);
+            ProductSnapshots = new ProductSnapshotRepository(_connection, () => _transaction);
+            ProcessedEvents = new ProcessedEventRepository(_connection, () => _transaction);
         }
 
         public ICustomerRepository Customers { get; }
         public IOrderRepository Orders { get; }
         public IPaymentRepository Payments { get; }
+        public IProductSnapshotRepository ProductSnapshots { get; }
+        public IProcessedEventRepository ProcessedEvents { get; }
 
         public async Task BeginTransactionAsync(IsolationLevel level = IsolationLevel.ReadCommitted,
                                                 CancellationToken ct = default)

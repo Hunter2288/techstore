@@ -9,12 +9,15 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orders.Api;
 using Orders.Api.HealthChecks;
+using Orders.Api.IntegrationEvents;
+using Platform.EventBus;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.WebHost.ConfigureKestrel(options => options.ConfigureEndpointDefaults(
     endpoint => endpoint.Protocols = HttpProtocols.Http1AndHttp2));
 builder.AddRedisDistributedCache("redis");
+builder.AddRabbitMQClient("messaging");
 builder.Services.AddMemoryCache(options => options.SizeLimit = 10_000);
 builder.Services.AddSingleton<OrderMetrics>();
 
@@ -24,15 +27,19 @@ var connectionString = builder.Configuration.GetConnectionString("OrdersDb")
 builder.Services.AddSingleton<OrdersDatabaseHealthCheck>();
 builder.Services.AddHealthChecks()
     .AddCheck<OrdersDatabaseHealthCheck>("orders-db", tags: ["database", "sql", "ready"], timeout: TimeSpan.FromSeconds(5))
-    .AddCheck<OrdersRedisHealthCheck>("redis-cache", tags: ["cache", "redis", "ready"], timeout: TimeSpan.FromSeconds(3));
+    .AddCheck<OrdersRedisHealthCheck>("redis-cache", tags: ["cache", "redis", "ready"], timeout: TimeSpan.FromSeconds(3))
+    .AddCheck<RabbitMqHealthCheck>("rabbitmq", tags: ["messaging", "ready"], timeout: TimeSpan.FromSeconds(3));
 builder.Services.AddGrpcHealthChecks();
 
 builder.Services.AddScoped<IUnitOfWork>(_ => new UnitOfWork(connectionString));
+builder.Services.AddScoped<IIntegrationEventHandler, ProductSnapshotHandler>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddSingleton<IHostedService>(sp => new OrdersDatabaseBootstrapper(
     connectionString, sp.GetRequiredService<ILogger<OrdersDatabaseBootstrapper>>()));
+builder.Services.AddSingleton(new RabbitMqConsumerOptions(RabbitMqTopology.OrdersQueue));
+builder.Services.AddHostedService<RabbitMqConsumer>();
 
 builder.Services.AddAutoMapper(cfg =>
 {

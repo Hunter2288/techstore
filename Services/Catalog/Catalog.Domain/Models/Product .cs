@@ -47,6 +47,13 @@ namespace Catalog.Domain.Models
             Touch(changedBy);
         }
 
+        public void Rename(string newName, string? changedBy = null)
+        {
+            if (string.IsNullOrWhiteSpace(newName)) throw new DomainException("Name is required");
+            Name = newName.Trim();
+            Touch(changedBy);
+        }
+
         public void AddStock(int quantity, string? changedBy = null)
         {
             if (quantity <= 0) throw new DomainException("Quantity must be positive");

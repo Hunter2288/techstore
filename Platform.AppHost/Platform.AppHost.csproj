@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.6.4">
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
 
   <ItemGroup>
     <ProjectReference Include="..\Services\Orders\Orders.Api\Orders.Api.csproj" />
@@ -9,9 +9,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.6.4" />
-    <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.6.4" />
-    <PackageReference Include="Aspire.Hosting.Redis" Version="13.6.4" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.6.5" />
+    <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.6.5" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.6.5" />
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.6.5" />
   </ItemGroup>
 
   <PropertyGroup>

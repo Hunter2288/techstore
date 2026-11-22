@@ -61,6 +61,16 @@ namespace Catalog.Api.Controllers
             return NoContent();
         }
 
+        [HttpPut("{id:long}/name")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Rename(long id, RenameProductDto input, CancellationToken ct)
+        {
+            await service.RenameAsync(id, input.Name, ct);
+            metrics.Updated("name");
+            return NoContent();
+        }
+
         [HttpPost("{id:long}/stock/remove")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

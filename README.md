@@ -250,3 +250,23 @@ Redis stays an optional cache dependency. Catalog's existing cache layer falls b
 Orders, Catalog, Reviews, and Aggregator expose meters `Orders.Api`, `Catalog.Api`, `Reviews.Api`, and `Aggregator.Api`. Business counters include `orders.created`, `orders.confirmed`, `products.created`, `products.updated`, `reviews.created`, and `orders.aggregation.requests`; histograms record operation durations, and Reviews exposes `reviews.requests.inflight`. Meter names are subscribed in ServiceDefaults alongside `Catalog.Cache` and Polly resilience telemetry. Metric tags use bounded operation/result/status values; no entity IDs are attached.
 
 Aspire AppHost probes each API with `WithHttpHealthCheck`, so resource state follows readiness (the Gateway uses liveness). To inspect the signals, run Aspire and open the Dashboard's Metrics, Traces, Logs, and Resources tabs. The local environment should be used to capture the required failure screenshots: stop Reviews to observe retries and partial responses, and stop Redis to observe `Degraded` while requests continue.
+
+## Lab 08: asynchronous events with RabbitMQ
+
+Aspire starts RabbitMQ as `messaging` with a persistent data volume and the Management plugin. Catalog publishes JSON integration events after a successful SQL save: `ProductCreatedEvent`, `ProductPriceChangedEvent`, `ProductRenamedEvent`, and `ProductDeletedEvent`. The topic exchange `catalog-events` routes `product.*` to independent `orders.catalog-sync` and `reviews.catalog-sync` queues. Each queue has a durable `.dlq` queue through `catalog-events.dlx`.
+
+The shared contracts, publisher, topology, deserializer, RabbitMQ health check, and W3C trace propagation live in `Platform.EventBus`. Each API registers the Aspire RabbitMQ client using the `messaging` reference. Consumers use manual acknowledgements, a maximum of three re-publication retries (`x-retry-count`), and send malformed or exhausted messages to the DLQ. Orders writes `ProductRefs` and `ProcessedEvents` in one SQL transaction; its upsert checks event time so older deliveries cannot replace a newer snapshot. Reviews updates matching `productName` values and records processed event IDs in MongoDB; updates are guarded by the event timestamp and are safe to replay.
+
+There is intentionally no transactional outbox in this lab implementation. A process failure after the Catalog database commit but before RabbitMQ accepts the publication can leave the source row updated without its event. An outbox would close this database-to-broker failure window.
+
+Run the platform with Docker Desktop using the Aspire instructions above. In the Dashboard, open the `messaging` resource and its Management endpoint to inspect exchanges and queues. Demonstration requests through the Gateway:
+
+```powershell
+# Update the catalog price; Orders.ProductRefs changes asynchronously, OrderItems remain snapshots.
+curl.exe -i -X PUT "http://localhost:5000/api/products/1/price" -H "Content-Type: application/json" -d '{"price":12345}'
+
+# Rename the product; matching review documents receive the new productName asynchronously.
+curl.exe -i -X PUT "http://localhost:5000/api/products/1/name" -H "Content-Type: application/json" -d '{"name":"Updated product name"}'
+```
+
+The consumers create `orders.catalog-sync.dlq` and `reviews.catalog-sync.dlq`. In Aspire Dashboard Traces, inspect the Catalog HTTP request and consumer spans; the publisher forwards `traceparent`, `tracestate`, and `X-Correlation-Id` as message metadata. Application logs include event type and ID. RabbitMQ Management UI shows ready, unacknowledged, and dead-lettered messages per queue.

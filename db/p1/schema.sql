@@ -25,6 +25,12 @@ CREATE TABLE dbo.ProductRefs (
     UpdatedAt DATETIME2 NOT NULL CONSTRAINT DF_ProductRefs_UpdatedAt DEFAULT SYSUTCDATETIME()
 );
 
+IF OBJECT_ID('dbo.ProcessedEvents') IS NULL
+CREATE TABLE dbo.ProcessedEvents (
+    EventId UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_ProcessedEvents PRIMARY KEY,
+    ProcessedAt DATETIME2 NOT NULL CONSTRAINT DF_ProcessedEvents_ProcessedAt DEFAULT SYSUTCDATETIME()
+);
+
 IF OBJECT_ID('dbo.Promotions') IS NULL
 CREATE TABLE dbo.Promotions (
     PromotionId     BIGINT IDENTITY(1,1) CONSTRAINT PK_Promotions PRIMARY KEY,

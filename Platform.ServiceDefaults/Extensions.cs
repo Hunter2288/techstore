@@ -48,6 +48,7 @@ public static class Extensions
                 .AddRuntimeInstrumentation())
             .WithTracing(tracing => tracing
                 .AddSource(builder.Environment.ApplicationName)
+                .AddSource("Platform.EventBus")
                 .AddSource("MongoDB.Driver.Core.Extensions.DiagnosticSources")
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()

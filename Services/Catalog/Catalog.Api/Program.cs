@@ -12,12 +12,15 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Catalog.Api;
 using Catalog.Api.HealthChecks;
+using Platform.EventBus;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.WebHost.ConfigureKestrel(options => options.ConfigureEndpointDefaults(
     endpoint => endpoint.Protocols = HttpProtocols.Http1AndHttp2));
 builder.AddRedisDistributedCache("redis");
+builder.AddRabbitMQClient("messaging");
+builder.Services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
 builder.Services.AddMemoryCache(options => options.SizeLimit = 10_000);
 
 var catalogConnectionString = builder.Configuration.GetConnectionString("CatalogDb")
@@ -25,7 +28,8 @@ var catalogConnectionString = builder.Configuration.GetConnectionString("Catalog
 builder.Services.AddSingleton<CatalogDatabaseHealthCheck>();
 builder.Services.AddHealthChecks()
     .AddCheck<CatalogDatabaseHealthCheck>("catalog-db", tags: ["database", "sql", "ready"], timeout: TimeSpan.FromSeconds(5))
-    .AddCheck<CatalogRedisHealthCheck>("redis-cache", tags: ["cache", "redis", "ready"], timeout: TimeSpan.FromSeconds(3));
+    .AddCheck<CatalogRedisHealthCheck>("redis-cache", tags: ["cache", "redis", "ready"], timeout: TimeSpan.FromSeconds(3))
+    .AddCheck<RabbitMqHealthCheck>("rabbitmq", tags: ["messaging", "ready"], timeout: TimeSpan.FromSeconds(3));
 builder.Services.AddGrpcHealthChecks();
 builder.Services.AddSingleton<CacheMetrics>();
 builder.Services.AddSingleton<CatalogMetrics>();

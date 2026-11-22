@@ -4,10 +4,13 @@ using System.Collections.Generic;
 using System.Text;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using Platform.EventBus;
 
 namespace Catalog.Bll.Services
 {
-    public class ProductService(IUnitOfWork uow, IMapper mapper, ILogger<ProductService>? logger = null) : IProductService
+    public class ProductService(IUnitOfWork uow, IMapper mapper, IEventPublisher publisher,
+        IHttpContextAccessor httpContextAccessor, ILogger<ProductService>? logger = null) : IProductService
     {
         private static readonly ActivitySource ActivitySource = new("Catalog.Api");
         public async Task<ProductCardDto> GetByIdAsync(long id, CancellationToken ct)
@@ -29,6 +32,7 @@ namespace Catalog.Bll.Services
 
             await uow.Products.AddAsync(product, ct);
             await uow.SaveChangesAsync(ct);
+            await PublishSnapshotAsync(new ProductCreatedEvent(product.ProductId, product.Name, product.Price), "product.created", ct);
             var result = mapper.Map<ProductDto>(product);
             activity?.SetTag("product.id", result.ProductId);
             activity?.SetTag("product.price", result.Price);
@@ -42,9 +46,21 @@ namespace Catalog.Bll.Services
             using var activity = ActivitySource.StartActivity("catalog.product.change-price");
             activity?.SetTag("product.id", id);
             var product = await GetActiveAsync(id, ct);
+            var oldPrice = product.Price;
             product.ChangePrice(newPrice, "api");
             await uow.SaveChangesAsync(ct);
+            await PublishSnapshotAsync(new ProductPriceChangedEvent(id, product.Name, oldPrice, product.Price), "product.price_changed", ct);
             logger?.LogInformation("Product {ProductId} price changed to {Price}", id, newPrice);
+        }
+
+        public async Task RenameAsync(long id, string newName, CancellationToken ct)
+        {
+            var product = await GetActiveAsync(id, ct);
+            var oldName = product.Name;
+            product.Rename(newName, "api");
+            await uow.SaveChangesAsync(ct);
+            await PublishSnapshotAsync(new ProductRenamedEvent(id, oldName, product.Name, product.Price), "product.renamed", ct);
+            logger?.LogInformation("Product {ProductId} renamed", id);
         }
 
         public async Task RemoveStockAsync(long id, int quantity, CancellationToken ct)
@@ -63,6 +79,7 @@ namespace Catalog.Bll.Services
             var product = await GetActiveAsync(id, ct);
             product.SoftDelete("api");
             await uow.SaveChangesAsync(ct);
+            await PublishSnapshotAsync(new ProductDeletedEvent(id, product.Name, product.Price), "product.deleted", ct);
         }
 
         public async Task<IReadOnlyList<ProductDto>> GetRecentlyAddedAsync(string category, int days, CancellationToken ct)
@@ -78,6 +95,13 @@ namespace Catalog.Bll.Services
             return product is null || product.IsDeleted
                 ? throw new EntityNotFoundException($"Product {id} not found")
                 : product;
+        }
+
+        private Task PublishSnapshotAsync<TEvent>(TEvent integrationEvent, string routingKey, CancellationToken ct)
+            where TEvent : IntegrationEvent
+        {
+            var correlationId = httpContextAccessor.HttpContext?.Request.Headers["X-Correlation-Id"].FirstOrDefault();
+            return publisher.PublishAsync(integrationEvent with { CorrelationId = correlationId }, routingKey, ct);
         }
 
         public async Task<PagedResult<ProductDto>> GetListAsync(ProductQuery q, CancellationToken ct)

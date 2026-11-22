@@ -8,6 +8,7 @@ public sealed class ReviewDocument
     public string Id { get; set; } = string.Empty;
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
+    public DateTime? ProductNameUpdatedAt { get; set; }
     public int? OrderId { get; set; }
     public bool IsVerifiedPurchase { get; set; }
     public AuthorDocument Author { get; set; } = new();

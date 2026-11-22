@@ -80,6 +80,9 @@ public sealed class CachedProductService(
     public Task ChangePriceAsync(long id, decimal newPrice, CancellationToken ct)
         => InvalidateAfterAsync(() => inner.ChangePriceAsync(id, newPrice, ct), id, ct);
 
+    public Task RenameAsync(long id, string newName, CancellationToken ct)
+        => InvalidateAfterAsync(() => inner.RenameAsync(id, newName, ct), id, ct);
+
     public Task RemoveStockAsync(long id, int quantity, CancellationToken ct)
         => InvalidateAfterAsync(() => inner.RemoveStockAsync(id, quantity, ct), id, ct);
 

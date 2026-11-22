@@ -30,6 +30,10 @@ public sealed class IndexCreationService : IHostedService
         };
         await _context.Reviews.Indexes.CreateManyAsync(reviewIndexes, cancellationToken);
 
+        await _context.ProcessedEvents.Indexes.CreateOneAsync(
+            new CreateIndexModel<BsonDocument>(new BsonDocument("_id", 1), new CreateIndexOptions { Unique = true }),
+            cancellationToken: cancellationToken);
+
         var discussionIndexes = new[]
         {
             new CreateIndexModel<BsonDocument>(
